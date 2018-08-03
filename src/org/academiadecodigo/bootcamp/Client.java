@@ -32,6 +32,15 @@ public class Client {
             name = sc.nextLine();
             out.println(name);
 
+            while (in.readLine().equals("false")){
+                System.out.println("This one is taken, please choose another nickname.");
+                name = sc.nextLine();
+                out.println(name);
+            }
+
+            System.out.println("Welcome! you can start chatting now");
+
+
             fixedPool.submit(new Runnable() {
                 @Override
                 public void run() {

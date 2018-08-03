@@ -6,7 +6,9 @@ import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.util.LinkedList;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -17,13 +19,13 @@ public class Server {
 
     private ServerSocket serverSocket;
     private ExecutorService cachedPool;
-    private LinkedList<ServerWorker> list;
+    private List<ServerWorker> list;
 
 
     public Server() {
         serverSocket = getServerSocket();
         cachedPool = Executors.newCachedThreadPool();
-        list = new LinkedList();
+        list = Collections.synchronizedList(new ArrayList<>());
     }
 
 
@@ -64,7 +66,7 @@ public class Server {
 
     }
 
-    public void sendAll(String message, ServerWorker sv) {
+    private synchronized void sendAll(String message, ServerWorker sv) {
 
         if (message.equals("/quit")) {
             for (ServerWorker serverWorker : list) {
@@ -82,6 +84,24 @@ public class Server {
             }
         }
 
+        if (message.contains("/private")) {
+
+            //TODO StringBuilder
+            String[] builderMessage = message.split(" ");
+            String privateMessage = "";
+
+            for (int i = 2; i < builderMessage.length; i++) {
+                privateMessage += builderMessage[i] + " ";
+            }
+
+            for (ServerWorker serverWorker : list) {
+                if (serverWorker.getNickName().equals(builderMessage[1])) {
+                    serverWorker.send("PRIVATE/ " + sv.getNickName() + ": " + privateMessage);
+                }
+            }
+            return;
+        }
+
         for (ServerWorker serverWorker : list) {
             if (!serverWorker.equals(sv)) {
                 serverWorker.send(sv.nickName + ": " + message);
@@ -89,6 +109,16 @@ public class Server {
         }
 
     }
+
+    public synchronized boolean checkNickname(String nickName, ServerWorker sv) {
+        for (ServerWorker serverWorker : list) {
+            if (serverWorker.getNickName().equals(nickName) && !serverWorker.equals(sv)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
 
     public class ServerWorker implements Runnable {
 
@@ -99,9 +129,13 @@ public class Server {
 
         public ServerWorker(Socket socket) {
             this.socket = socket;
+            this.nickName = "";
             getStreams();
         }
 
+        public String getNickName() {
+            return nickName;
+        }
 
         @Override
         public void run() {
@@ -109,6 +143,13 @@ public class Server {
             try {
 
                 nickName = in.readLine();
+
+                while (!checkNickname(nickName, this)){
+                out.println("false");
+                nickName = in.readLine();
+                }
+
+                out.println("true");
 
                 while (true) {
 
